@@ -65,7 +65,7 @@ struct _tokens tokens [100];
 //where should this go?
 void cleanse (char * buffer){
 
-  char *startPtr;
+  char *startPtr; //
   int count = 0;
   int i;
   startPtr = strstr (buffer, "\"");
@@ -83,10 +83,7 @@ void cleanse (char * buffer){
   }
 }
 
-
-
-
-
+//daves
 
 int findTokens(char *buffer , struct _tokens *tokens){
   
@@ -128,35 +125,78 @@ int findTokens(char *buffer , struct _tokens *tokens){
   return counter;
 }
 
+void receive_data(int sd) {
+    struct sockaddr_in client_address;
+    socklen_t addrlen;
+    char buffer[10000];
+    int n;
 
+    addrlen = sizeof(client_address);
+    memset(buffer, 0, sizeof(buffer)); // clear buffer before receiving data
 
+    n = recvfrom(sd, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_address, &addrlen);
 
+    if (n < 0) {
+        perror("Error receiving data");
+        exit(EXIT_FAILURE);
+    }
 
-//Main fucntion to call and create socket descriptor
-int main(int argc, char *argv[])
-{
-  int sd; /* socket descriptor */
+    // Parse key-value pairs
+    int num_tokens = findTokens(buffer, tokens);
+
+    // Print parsed key-value pairs
+    for (int i = 0; i < num_tokens; i++) {
+        printf("Key: %s, Value: %s\n", tokens[i].key, tokens[i].value);
+    }
+}
+
+int main(int argc, char *argv[]) {
+  int sd;
   /* first, decide if we have the right number of parameters */
   if (argc < 2){
     printf("usage is: server <portnumber>\n");
     exit (1);
   }
-  //char* serverIP = argv[1];
-  //check_ip_validity(serverIP); //calls function
-  //int portNumber = check_port_validity(argv[2]); //do i need this?
+
+  int portNumber = check_port_validity(argv[1]);
   sd = socket(AF_INET, SOCK_DGRAM, 0); /* create a socket */
-  /* always check for errors */
+
   if (sd == -1){
     perror("socket error");
     exit(1);
+  }
 
-  } /* means some kind of error occured */
+  bind_socket(sd, portNumber);
 
+  struct sockaddr_in client_address;
+  socklen_t client_address_len = sizeof(client_address);
 
+  while (1) {
+    char bufferIn[10000];
+    memset(bufferIn, 0, sizeof(bufferIn)); // always null out buffers in C before using them
+    int bytes_received = recvfrom(sd, bufferIn, sizeof(bufferIn), 0, (struct sockaddr*)&client_address, &client_address_len);
 
-  //int reveived_data_result = receive_data(sd); //calls the receive function to print
+    if (bytes_received < 0) {
+      perror("Error receiving data");
+      exit(EXIT_FAILURE);
+    }
 
+    printf("Received data from %s:%d\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port));
+    printf("Message: %s\n", bufferIn);
+
+    cleanse(bufferIn);
+    int num_tokens = findTokens(bufferIn, tokens);
+    printf("Found %d key-value pairs:\n", num_tokens);
+
+    for (int i = 0; i < num_tokens; i++) {
+      printf("Key: %s, Value: %s\n", tokens[i].key, tokens[i].value);
+    }
+  }
+
+  close(sd);
   return 0;
-
-
 }
+
+
+
+
